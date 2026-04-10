@@ -8,9 +8,9 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&display=swap');
-        body { font-family: 'Noto Sans KR', sans-serif; background-color: #f9fafb; margin: 0; }
+        body { font-family: 'Noto Sans KR', sans-serif; background-color: #f9fafb; margin: 0; -webkit-tap-highlight-color: transparent; }
         .checkout-badge { font-size: 8px; font-weight: 900; margin-top: 2px; }
-        .loading-spinner { border: 3px solid #f3f3f3; border-top: 3px solid #ea580c; border-radius: 50%; width: 20px; height: 20px; animation: spin 1s linear infinite; display: inline-block; }
+        .loading-spinner { border: 2px solid #f3f3f3; border-top: 2px solid #ea580c; border-radius: 50%; width: 16px; height: 16px; animation: spin 1s linear infinite; display: inline-block; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
 </head>
@@ -18,11 +18,11 @@
     <div id="app" class="max-w-md mx-auto min-h-screen pb-10">
         <div class="bg-orange-600 text-white p-10 rounded-b-[40px] shadow-lg text-center relative">
             <div class="flex justify-between items-center px-4">
-                <button onclick="changeMonth(-1)"><i class="fas fa-chevron-left text-2xl"></i></button>
+                <button onclick="changeMonth(-1)" class="p-2"><i class="fas fa-chevron-left text-2xl"></i></button>
                 <h2 id="month-title" class="text-3xl font-black">2026년 4월</h2>
-                <button onclick="changeMonth(1)"><i class="fas fa-chevron-right text-2xl"></i></button>
+                <button onclick="changeMonth(1)" class="p-2"><i class="fas fa-chevron-right text-2xl"></i></button>
             </div>
-            <p id="status-text" class="mt-2 text-orange-200 text-xs font-bold tracking-widest italic">데이터 동기화 중...</p>
+            <p id="status-text" class="mt-2 text-orange-200 text-xs font-bold tracking-widest italic">연동 중...</p>
         </div>
 
         <div class="p-6">
@@ -35,52 +35,54 @@
         <div id="memo-modal" class="fixed inset-0 bg-black/70 hidden flex items-end z-50">
             <div class="bg-white w-full rounded-t-[40px] p-8 pb-12 shadow-2xl">
                 <div class="flex justify-between items-center mb-6">
-                    <h3 id="memo-date" class="text-2xl font-bold text-gray-800">날짜 메모</h3>
-                    <button onclick="closeModal()" class="text-gray-400 text-3xl">&times;</button>
+                    <h3 id="memo-date" class="text-2xl font-bold">날짜 메모</h3>
+                    <button onclick="closeModal()" class="text-3xl">&times;</button>
                 </div>
                 <p class="text-orange-600 font-black mb-2 italic text-sm">"혜빈님께 전달드립니다" <span id="save-loader" class="hidden ml-2"><span class="loading-spinner"></span></span></p>
-                <textarea id="memo-input" class="w-full h-48 p-5 border-2 border-orange-100 rounded-[25px] outline-none focus:border-orange-500 text-lg shadow-inner" placeholder="내용을 입력하세요."></textarea>
-                <button id="save-btn" onclick="saveMemo()" class="w-full bg-orange-600 text-white font-black py-5 rounded-[25px] mt-6 text-xl shadow-lg active:scale-95">저장하기</button>
+                <textarea id="memo-input" class="w-full h-48 p-5 border-2 border-orange-100 rounded-[25px] outline-none focus:border-orange-500 text-lg" placeholder="내용을 입력하세요."></textarea>
+                <button id="save-btn" onclick="saveMemo()" class="w-full bg-orange-600 text-white font-black py-5 rounded-[25px] mt-6 text-xl shadow-lg">저장하기</button>
             </div>
         </div>
     </div>
 
     <script>
-        const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzlyTihtVW6ifYm2Z0-OMGwaNurlYWfda5-ZCGrpyRNylH4OGpV0OuP0QScZl31grTQ/exec";
+        const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwx1LCnIKw9qZlb2G2cJI4EW9QtA6rk1bk24lLAmwvChh2LXwaDXCKOelfuc59y2WsAZA/exec";
         
         let currentMonth = new Date();
         let checkoutDates = [];
         let allMemos = {};
 
+        // [최적화] 시작하자마자 일단 달력부터 그립니다! (속도 향상)
         async function init() {
-            await fetchCalendar();
-            await fetchMemos();
-            renderCalendar();
+            renderCalendar(); 
+            // 그 다음 데이터를 조용히 가져옵니다.
+            await Promise.all([fetchCalendar(), fetchMemos()]);
+            renderCalendar(); // 데이터 오면 점 찍어주기 위해 한 번 더 그림
         }
 
         async function fetchCalendar() {
             try {
                 const res = await fetch('/api/calendar');
                 checkoutDates = await res.json();
-                document.getElementById('status-text').innerText = "✅ 혜빈님, 실시간 동기화 완료";
+                document.getElementById('status-text').innerText = "✅ 실시간 동기화 완료";
             } catch (e) {
-                document.getElementById('status-text').innerText = "⚠️ 연동 확인 필요";
+                document.getElementById('status-text').innerText = "⚠️ 동기화 확인 필요";
             }
         }
 
         async function fetchMemos() {
             try {
-                const res = await fetch(WEB_APP_URL);
+                // 주소 끝에 타임스탬프를 붙여서 모바일이 '옛날 데이터'를 안 쓰게 강제합니다.
+                const res = await fetch(WEB_APP_URL + "?t=" + new Date().getTime());
                 allMemos = await res.json();
-            } catch (e) {
-                console.error("메모 로드 실패", e);
-            }
+            } catch (e) { console.error(e); }
         }
 
         function renderCalendar() {
             const grid = document.getElementById('calendar-grid');
             const title = document.getElementById('month-title');
             grid.innerHTML = '';
+            
             const year = currentMonth.getFullYear();
             const month = currentMonth.getMonth();
             title.innerText = `${year}년 ${month + 1}월`;
@@ -96,7 +98,7 @@
                 const memoContent = allMemos[dateStr];
                 
                 const dayEl = document.createElement('div');
-                dayEl.className = `relative h-16 flex items-center justify-center rounded-2xl shadow-sm text-lg font-bold cursor-pointer transition-all ${isCheckout ? 'bg-orange-500 text-white scale-105 z-10 shadow-lg' : 'bg-white text-gray-700'}`;
+                dayEl.className = `relative h-16 flex items-center justify-center rounded-2xl shadow-sm text-lg font-bold cursor-pointer transition-all ${isCheckout ? 'bg-orange-500 text-white' : 'bg-white text-gray-700'}`;
                 
                 dayEl.innerHTML = `
                     <div class="flex flex-col items-center">
@@ -130,26 +132,28 @@
             try {
                 await fetch(WEB_APP_URL, {
                     method: 'POST',
+                    mode: 'no-cors', // 모바일 저장 실패를 막기 위한 마법의 한 줄!
                     body: JSON.stringify({ date: selectedDate, content: content })
                 });
+                
+                // 저장 성공 후 즉시 화면 반영
                 allMemos[selectedDate] = content;
                 renderCalendar();
-                closeModal();
+                setTimeout(() => closeModal(), 500);
             } catch (e) {
-                alert("저장 실패! 다시 시도해주세요.");
+                alert("연결 확인 중... (시트를 확인해주세요)");
+                closeModal();
             } finally {
                 btn.disabled = false;
                 loader.classList.add('hidden');
             }
         }
 
-        function closeModal() {
-            document.getElementById('memo-modal').classList.add('hidden');
-        }
+        function closeModal() { document.getElementById('memo-modal').classList.add('hidden'); }
 
         function changeMonth(diff) {
             currentMonth.setMonth(currentMonth.getMonth() + diff);
-            init();
+            renderCalendar(); // 달 이동은 데이터 로딩 없이 바로 그립니다! (초고속)
         }
 
         init();
